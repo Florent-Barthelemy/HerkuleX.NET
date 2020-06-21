@@ -1,5 +1,5 @@
 # HerkuleX.NET
-A C# written library to manage Herkulex DRS servos via a serial port#
+A C# written library to manage Herkulex DRS servos via a serial port
 
 # Current features
 Quick guides on added features
@@ -8,16 +8,20 @@ Quick guides on added features
 ```csharp
 I_JOG(SerialPort port, IJOG_TAG ServoTag)
 ```
-The I_JOG tag allows the user to declare a servo configuration
+The I_JOG tag structure allows the user to declare a servo's I_JOG configuration
 ```csharp
-   TAG.ID
-   TAG.mode
-   TAG.playTime 
-   TAG.LED_GREEN
-   TAG.LED_BLUE
-   TAG.LED_RED 
-   TAG.JOG
-   TAG.SET  //only get accessor, set has no effect
+IJOG_TAG tag = new IJOG_TAG()
+```
+params
+```csharp
+tag.ID
+tag.mode
+tag.playTime 
+tag.LED_GREEN
+tag.LED_BLUE
+tag.LED_RED 
+tag.JOG
+tag.SET  //only get accessor, set has no effect
 ```
    
 
