@@ -7,7 +7,7 @@ using LocalEventArgsLibrary;
 
 namespace HerkulexReceptManager
 {
-    public class herkulexRecept
+    public class HerkulexReceptControl
     {
 
         receptionStates rcvState = receptionStates.Waiting;

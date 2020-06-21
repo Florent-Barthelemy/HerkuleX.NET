@@ -26,7 +26,7 @@ For 2 byte variables, using little-endian storage in both ram and rom memory (LS
 
 namespace HerkulexController
 {
-    public class ServoController
+    public class HerkulexSendControl
     {
 
         /// <summary>
@@ -100,135 +100,7 @@ namespace HerkulexController
             port.Write(packet, 0, packet.Length);
         }
 
-        /// <summary>
-        /// Holds the Servo configuration for S_JOG / I_JOG
-        /// </summary>
-        public struct IJOG_TAG
-        {
-            public byte mode;
-            public byte ID;
-            public byte playTime;
-            public byte LED_GREEN;
-            public byte LED_BLUE;
-            public byte LED_RED;
-
-            private byte _SET;
-            public  byte SET
-            {
-                get
-                {
-                    _SET = 0;
-                    _SET |= (byte)(mode << 1);
-                    _SET |= (byte)(LED_GREEN << 2);
-                    _SET |= (byte)(LED_BLUE << 3);
-                    _SET |= (byte)(LED_RED << 4);
-                    return _SET;
-                }
-            }
-
-            private UInt16 _JOG;
-            public UInt16 JOG
-            {
-                get => _JOG;
-                set { _JOG = (ushort)(value & 0xEFFF); } //set bit 15 to 0
-            }
-        }
-
-        /// <summary>
-        /// Jog mode
-        /// </summary>
-        public enum JOG_MODE
-        {
-            positionControlJOG = 1,
-            infiniteTurn = 0
-        }
-
-        /// <summary>
-        ///all controller commands set
-        /// </summary>
-        public enum ToServoCommandSet
-        {
-            EEP_WRITE = 0x01,
-            EEP_READ = 0x02,
-            RAM_WRITE = 0x03,
-            RAM_READ = 0x04,
-            I_JOG = 0x05,
-            S_JOG = 0x06,
-            STAT = 0x07,
-            ROLLBACK = 0x08,
-            REBOOT = 0x09
-        }
-
-        /// <summary>
-        /// all commands ACK set
-        /// </summary>
-        public enum ToControllerAckSet
-        {
-            ack_EEP_WRITE = 0x41,
-            ack_EEP_READ = 0x42,
-            ack_RAM_WRITE = 0x43,
-            ack_RAM_READ = 0x44,
-            ack_I_JOG = 0x45,
-            ack_S_JOG = 0x46,
-            ack_STAT = 0x47,
-            ack_ROLLBACK = 0x48,
-            ack_REBOOT = 0x49
-        }
-
-        /// <summary>
-        /// all of the register addrs
-        /// </summary>
-        public enum MEM_ADDR
-        {
-            ID = 0,                                 //Byte length: 1
-            ACK_Policy = 1,                         //Byte length: 1
-            Alarm_LED_Policy = 2,                   //Byte length: 1
-            Torque_policy = 3,                      //Byte length: 1
-            Max_Temperature = 5,                    //Byte length: 1
-            Min_Voltage = 6,                        //Byte length: 1
-            Max_Voltage = 7,                        //Byte length: 1
-            Acceleration_Ratio = 8,                 //Byte length: 1
-            Max_Acceleration = 9,                   //Byte length: 1
-            Dead_Zone = 10,                         //Byte length: 1
-            Saturator_Offset = 11,                  //Byte length: 1
-            Saturator_Slope = 12,                   //Byte length: 2
-            PWM_Offset = 14,                        //Byte length: 1
-            Min_PWM = 15,                           //Byte length: 1
-            Max_PWM = 16,                           //Byte length: 2
-            Overload_PWM_Threshold = 18,            //Byte length: 2
-            Min_Position = 20,                      //Byte length: 2
-            Max_Position = 22,                      //Byte length: 2
-            Position_Kp = 24,                       //Byte length: 2
-            Position_Kd = 26,                       //Byte length: 2
-            Position_Ki = 28,                       //Byte length: 2
-            Pos_FreeFoward_1st_Gain = 30,           //Byte length: 2
-            Pos_FreeFoward_2nd_Gain = 32,           //Byte length: 2
-            LED_Blink_Period = 38,                  //Byte length: 1
-            ADC_Fault_Detect_Period = 39,           //Byte length: 1
-            Packet_Garbage_Detection_Period = 40,   //Byte length: 1
-            Stop_Detection_Period = 41,             //Byte length: 1
-            Overload_Detection_Period = 42,         //Byte length: 1
-            Stop_Threshold = 41,                    //Byte length: 1
-            Inposition_Margin = 44,                 //Byte length: 1
-            Calibration_Difference = 47,            //Byte length: 1
-            Status_Error = 48,                      //Byte length: 1
-            Status_Detail = 49,                     //Byte length: 1
-            Torque_Control = 52,                    //Byte length: 1
-            LED_Control = 53,                       //Byte length: 1
-            Voltage = 54,                           //Byte length: 2
-            Temperature = 55,                       //Byte length: 2
-            Current_Control_Mode = 56,              //Byte length: 2
-            Tick = 57,                              //Byte length: 2
-            Calibrated_Position = 58,               //Byte length: 2
-            Absolute_Position = 60,                 //Byte length: 2
-            Differential_Position = 62,             //Byte length: 2
-            PWM = 64,                               //Byte length: 2
-            Absolute_Goal_Position = 68,            //Byte length: 2
-            Absolute_Desired_Traject_Pos = 70,      //Byte length: 2
-            Desired_Velocity = 72                   //Byte length: 1
-        }
-
-
+       
         /// <summary>
         /// all of the two bytes length only addresses (use in GetMemoryAddrLength)
         /// </summary>
@@ -261,6 +133,7 @@ namespace HerkulexController
             byte checksum = (byte)(pSIZE ^ pID ^ CMD);
             for (int i = 0; i < data.Length; i++)
                 checksum ^= data[i];
+            checksum &= 0xFE;
             return checksum;
         }
 
@@ -288,5 +161,133 @@ namespace HerkulexController
             return 0x01; //if the address does not belongs to the two bytes length set, return 1, exit func
         }
 
+    }
+
+    /// <summary>
+    /// Holds the Servo configuration for S_JOG / I_JOG
+    /// </summary>
+    public struct IJOG_TAG
+    {
+        public JOG_MODE mode;
+        public byte ID;
+        public byte playTime;
+        public byte LED_GREEN;
+        public byte LED_BLUE;
+        public byte LED_RED;
+
+        private byte _SET;
+        public byte SET
+        {
+            get
+            {
+                _SET = 0;
+                _SET |= (byte)((byte)mode << 1);
+                _SET |= (byte)(LED_GREEN << 2);
+                _SET |= (byte)(LED_BLUE << 3);
+                _SET |= (byte)(LED_RED << 4);
+                return _SET;
+            }
+        }
+
+        private UInt16 _JOG;
+        public UInt16 JOG
+        {
+            get => _JOG;
+            set { _JOG = (ushort)(value & 0xEFFF); } //set bit 15 to 0
+        }
+    }
+
+    /// <summary>
+    /// Jog mode
+    /// </summary>
+    public enum JOG_MODE
+    {
+        positionControlJOG = 0,
+        infiniteTurn = 1
+    }
+
+    /// <summary>
+    ///all controller commands set
+    /// </summary>
+    public enum ToServoCommandSet
+    {
+        EEP_WRITE = 0x01,
+        EEP_READ = 0x02,
+        RAM_WRITE = 0x03,
+        RAM_READ = 0x04,
+        I_JOG = 0x05,
+        S_JOG = 0x06,
+        STAT = 0x07,
+        ROLLBACK = 0x08,
+        REBOOT = 0x09
+    }
+
+    /// <summary>
+    /// all commands ACK set
+    /// </summary>
+    public enum ToControllerAckSet
+    {
+        ack_EEP_WRITE = 0x41,
+        ack_EEP_READ = 0x42,
+        ack_RAM_WRITE = 0x43,
+        ack_RAM_READ = 0x44,
+        ack_I_JOG = 0x45,
+        ack_S_JOG = 0x46,
+        ack_STAT = 0x47,
+        ack_ROLLBACK = 0x48,
+        ack_REBOOT = 0x49
+    }
+
+    /// <summary>
+    /// all of the register addrs
+    /// </summary>
+    public enum MEM_ADDR
+    {
+        ID = 0,                                 //Byte length: 1
+        ACK_Policy = 1,                         //Byte length: 1
+        Alarm_LED_Policy = 2,                   //Byte length: 1
+        Torque_policy = 3,                      //Byte length: 1
+        Max_Temperature = 5,                    //Byte length: 1
+        Min_Voltage = 6,                        //Byte length: 1
+        Max_Voltage = 7,                        //Byte length: 1
+        Acceleration_Ratio = 8,                 //Byte length: 1
+        Max_Acceleration = 9,                   //Byte length: 1
+        Dead_Zone = 10,                         //Byte length: 1
+        Saturator_Offset = 11,                  //Byte length: 1
+        Saturator_Slope = 12,                   //Byte length: 2
+        PWM_Offset = 14,                        //Byte length: 1
+        Min_PWM = 15,                           //Byte length: 1
+        Max_PWM = 16,                           //Byte length: 2
+        Overload_PWM_Threshold = 18,            //Byte length: 2
+        Min_Position = 20,                      //Byte length: 2
+        Max_Position = 22,                      //Byte length: 2
+        Position_Kp = 24,                       //Byte length: 2
+        Position_Kd = 26,                       //Byte length: 2
+        Position_Ki = 28,                       //Byte length: 2
+        Pos_FreeFoward_1st_Gain = 30,           //Byte length: 2
+        Pos_FreeFoward_2nd_Gain = 32,           //Byte length: 2
+        LED_Blink_Period = 38,                  //Byte length: 1
+        ADC_Fault_Detect_Period = 39,           //Byte length: 1
+        Packet_Garbage_Detection_Period = 40,   //Byte length: 1
+        Stop_Detection_Period = 41,             //Byte length: 1
+        Overload_Detection_Period = 42,         //Byte length: 1
+        Stop_Threshold = 41,                    //Byte length: 1
+        Inposition_Margin = 44,                 //Byte length: 1
+        Calibration_Difference = 47,            //Byte length: 1
+        Status_Error = 48,                      //Byte length: 1
+        Status_Detail = 49,                     //Byte length: 1
+        Torque_Control = 52,                    //Byte length: 1
+        LED_Control = 53,                       //Byte length: 1
+        Voltage = 54,                           //Byte length: 2
+        Temperature = 55,                       //Byte length: 2
+        Current_Control_Mode = 56,              //Byte length: 2
+        Tick = 57,                              //Byte length: 2
+        Calibrated_Position = 58,               //Byte length: 2
+        Absolute_Position = 60,                 //Byte length: 2
+        Differential_Position = 62,             //Byte length: 2
+        PWM = 64,                               //Byte length: 2
+        Absolute_Goal_Position = 68,            //Byte length: 2
+        Absolute_Desired_Traject_Pos = 70,      //Byte length: 2
+        Desired_Velocity = 72                   //Byte length: 1
     }
 }
