@@ -1,8 +1,23 @@
 # HerkuleX.NET
 A C# written library to manage Herkulex DRS servos via a serial port
 
-# Current features
-Quick guides on added features
+# Console commands
+Features
+### Commands
+moveto (I_JOG)
+```
+moveto <ID> <JOG>
+```
+torqueControl
+```
+torqueControl <ID> <TRK_ON, BRK_ON, TRK_FREE>
+```
+RAM_READ
+```
+RAM_READ <pID> <StartAddr> <Length>
+```
+
+# Implemented
 
 ### I_JOG command and I_JOG tags
 ```csharp
@@ -23,5 +38,7 @@ tag.LED_RED
 tag.JOG
 tag.SET  //only get accessor, set has no effect
 ```
+# RAM_READ, RAM_WRITE
+---
    
 
