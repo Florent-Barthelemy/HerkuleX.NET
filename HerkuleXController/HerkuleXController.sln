@@ -5,9 +5,7 @@ VisualStudioVersion = 16.0.30104.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkuleXControlShell", "HerkuleXControlShell.csproj", "{A366018C-BCDB-4515-934D-55F1CBAE3E23}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkulexSendController", "..\lib\HerkulexCom\HerkulexSendController.csproj", "{ADA2C3AB-18D0-4391-8066-272AB39102AA}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkulexRecptController", "..\lib\HerkulexReceptManager\HerkulexRecptController.csproj", "{BF6C02FD-E547-4BE0-94B5-8F43CD4244B0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkulexController", "..\lib\HerkulexCom\HerkulexController.csproj", "{ADA2C3AB-18D0-4391-8066-272AB39102AA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtendedSerialPort", "..\lib\ExtendedSerialPort\ExtendedSerialPort.csproj", "{21AC599E-E3D5-4181-AA0F-7C2E00CCA016}"
 EndProject
@@ -27,10 +25,6 @@ Global
 		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BF6C02FD-E547-4BE0-94B5-8F43CD4244B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BF6C02FD-E547-4BE0-94B5-8F43CD4244B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BF6C02FD-E547-4BE0-94B5-8F43CD4244B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BF6C02FD-E547-4BE0-94B5-8F43CD4244B0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{21AC599E-E3D5-4181-AA0F-7C2E00CCA016}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{21AC599E-E3D5-4181-AA0F-7C2E00CCA016}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{21AC599E-E3D5-4181-AA0F-7C2E00CCA016}.Release|Any CPU.ActiveCfg = Release|Any CPU

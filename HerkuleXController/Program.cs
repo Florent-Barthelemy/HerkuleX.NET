@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.IO.Ports;
 
 using HerkulexController;
-using HerkulexReceptManager;
 using ExtendedSerialPort;
 using System.Threading;
 
@@ -15,10 +14,10 @@ namespace HerkuleXControlShell
     class Program
     {
         static ReliableSerialPort ComPort = new ReliableSerialPort("COM7", 115200, Parity.None, 8, StopBits.One);
-        static HerkulexSendControl SendController = new HerkulexSendControl();
-        static HerkulexReceptControl ReceptController = new HerkulexReceptControl();
+        static HklxController HrController = new HklxController();
+        static HklxDecoder HrDecoder = new HklxDecoder();
 
-        //servo 1 I_JOG config
+        //floating servo config
         static IJOG_TAG floatingConfig = new IJOG_TAG
         {
             ID = 0x01,
@@ -34,8 +33,11 @@ namespace HerkuleXControlShell
 
         static void Main(string[] args)
         {
-            ComPort.DataReceived += ReceptController.HerkulexDecodeIncommingPacket;
-            ReceptController.OnHerkulexIncommingMessageDecodedEvent += ReceptController_OnHerkulexIncommingMessageDecodedEvent;
+
+            ComPort.DataReceived += HrDecoder.DecodePacket;
+            HrDecoder.OnDataDecodedEvent += HrDecoder_OnHerkulexIncommingMessageDecodedEvent;
+
+            ComPort.Open();
 
             while (lockShell)
             {
@@ -52,24 +54,32 @@ namespace HerkuleXControlShell
                         {
                             floatingConfig.ID = Convert.ToByte(parsedCmd[1]);
                             floatingConfig.JOG = Convert.ToUInt16(parsedCmd[2]);
-                            SendController.I_JOG(ComPort, floatingConfig);
+                            HrController.I_JOG(ComPort, floatingConfig);
                         }
                         break;
 
                     //implemented, working
                     case "torqueControl":
                         if (parsedCmd.Length == 1)
-                            Console.WriteLine("torqueControlON <ID> <TRK_ON, BRK_ON, TRK_FREE>");
+                            Console.WriteLine("torqueControl <ID> <TRK_ON, BRK_ON, TRK_FREE>");
                         else
                         {
                             if(parsedCmd[2] == "TRK_ON")
-                                SendController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), MEM_ADDR.Torque_Control, 1, 0x60);
+                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), RAM_ADDR.Torque_Control, 1, 0x60);
                             if (parsedCmd[2] == "BRK_ON")
-                                SendController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), MEM_ADDR.Torque_Control, 1, 0x40);
+                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), RAM_ADDR.Torque_Control, 1, 0x40);
                             if (parsedCmd[2] == "TRK_FREE")
-                                SendController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), MEM_ADDR.Torque_Control, 1, 0x00);
+                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), RAM_ADDR.Torque_Control, 1, 0x00);
                         }
-                            
+                        break;
+
+                    case "RAM_READ":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("RAM_READ <pID> <StartAddr> <Length>");
+                        else
+                        {
+                            HrController.RAM_READ(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
+                        }
                         break;
 
                     case "disconnect":
@@ -88,7 +98,7 @@ namespace HerkuleXControlShell
             }
         }
 
-        private static void ReceptController_OnHerkulexIncommingMessageDecodedEvent(object sender, LocalEventArgsLibrary.HerkulexIncommingPacketDecodedArgs e)
+        private static void HrDecoder_OnHerkulexIncommingMessageDecodedEvent(object sender, LocalEventArgsLibrary.HerkulexPacketDecodedArgs e)
         {
             
         }

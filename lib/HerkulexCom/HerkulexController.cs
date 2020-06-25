@@ -1,15 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO.Ports;
-using System.Net.Sockets;
-using System.Net.Http;
-using System.Security.Permissions;
-using System.Diagnostics.Tracing;
-using System.Collections;
-using System.Runtime.CompilerServices;
+using LocalEventArgsLibrary;
+
 
 /* Herkulex UART params:
 Stop Bit : 1
@@ -26,8 +18,26 @@ For 2 byte variables, using little-endian storage in both ram and rom memory (LS
 
 namespace HerkulexController
 {
-    public class HerkulexSendControl
+    public class HklxController
     {
+        public void RAM_READ(SerialPort port, byte pID, byte startAddr, byte length)
+        {
+            byte pSIZE = 9;
+            byte[] packet = new byte[pSIZE];
+            byte[] data = { (byte)startAddr, length };
+
+            packet[0] = 0xFF;
+            packet[1] = 0xFF;
+            packet[2] = pSIZE;
+            packet[3] = pID;
+            packet[4] = (byte)ToServoCommandSet.RAM_READ;
+            packet[5] = CheckSum1(packet[2], packet[3], packet[4], data);
+            packet[6] = CheckSum2(packet[5]);
+            packet[7] = data[0];
+            packet[8] = data[1];
+
+            port.Write(packet, 0, packet.Length);
+        }
 
         /// <summary>
         /// Writes to the specified servo RAM memory
@@ -37,7 +47,7 @@ namespace HerkulexController
         /// <param name="addr">Start memory address</param>
         /// <param name="length">Length of the data to write</param>
         /// <param name="value">data</param>
-        public void RAM_WRITE(SerialPort port, byte pID, MEM_ADDR addr, byte length, UInt16 value)
+        public void RAM_WRITE(SerialPort port, byte pID, RAM_ADDR addr, byte length, UInt16 value)
         {
             byte pSIZE = (byte)(9 + length);
             byte[] packet = new byte[pSIZE];
@@ -70,7 +80,7 @@ namespace HerkulexController
 
         }
 
-         /// <summary>
+        /// <summary>
         /// Sends I_JOG command
         /// </summary>
         /// <param name="port">Serial port to use</param>
@@ -128,7 +138,7 @@ namespace HerkulexController
             Absolute_Desired_Traject_Pos = 70,      //Byte length: 2
         }
 
-        byte CheckSum1(byte pSIZE, byte pID, byte CMD, byte[] data)
+        public byte CheckSum1(byte pSIZE, byte pID, byte CMD, byte[] data)
         {
             byte checksum = (byte)(pSIZE ^ pID ^ CMD);
             for (int i = 0; i < data.Length; i++)
@@ -137,7 +147,7 @@ namespace HerkulexController
             return checksum;
         }
 
-        byte CheckSum2(byte checkSum1)
+        public byte CheckSum2(byte checkSum1)
         {
             byte checkSum2 = (byte)((~checkSum1) & 0xFE);
             return checkSum2;
@@ -161,6 +171,126 @@ namespace HerkulexController
             return 0x01; //if the address does not belongs to the two bytes length set, return 1, exit func
         }
 
+    }
+
+   public class HklxDecoder
+    {
+        ReceptionStates rcvState = ReceptionStates.Waiting;
+
+        private byte packetSize = 0;
+        private byte pID = 0;
+        private byte cmd = 0;
+        private byte checkSum1 = 0;
+        private byte checkSum2 = 0;
+        private byte[] packetData;
+
+        private byte packetDataByteIndex = 0;
+
+        private enum ReceptionStates
+        {
+            Waiting,
+            sof2,
+            packetSize,
+            pID,
+            CMD,
+            checkSum1,
+            checkSum2,
+            data,
+        }
+
+        //DataReceived input event, decoding the packet with a state machine for each received bytes
+        public void DecodePacket(object sender, DataReceivedArgs e)
+        {
+            foreach (byte b in e.Data)
+            {
+
+                //state machine
+                switch (rcvState)
+                {
+                    case ReceptionStates.Waiting:
+                        if (b == 0xFF)
+                            rcvState = ReceptionStates.sof2;
+                        break;
+
+                    case ReceptionStates.sof2:
+                        if (b == 0xFF)
+                            rcvState = ReceptionStates.packetSize;
+                        break;
+
+                    case ReceptionStates.packetSize:
+                        packetSize = b;
+                        packetData = new byte[packetSize - 7]; //init to the data size
+                        rcvState = ReceptionStates.pID;
+                        break;
+
+                    case ReceptionStates.pID:
+                        pID = b;
+                        rcvState = ReceptionStates.CMD;
+                        break;
+
+                    case ReceptionStates.CMD:
+                        cmd = b;
+                        rcvState = ReceptionStates.checkSum1;
+                        break;
+
+                    case ReceptionStates.checkSum1:
+                        checkSum1 = b;
+                        rcvState = ReceptionStates.checkSum2;
+                        break;
+
+                    case ReceptionStates.checkSum2:
+                        checkSum2 = b;
+                        rcvState = ReceptionStates.data;
+                        break;
+
+                    case ReceptionStates.data:
+                        if (packetDataByteIndex < packetData.Length)
+                        {
+                            packetData[packetDataByteIndex] = b;
+                            packetDataByteIndex++;
+                            if(packetDataByteIndex == packetData.Length)
+                            {
+                                packetDataByteIndex = 0;
+                                OnDataDecoded(packetSize, pID, cmd, checkSum1, checkSum2, packetData); //fire the decoded data event
+                                rcvState = ReceptionStates.Waiting; //back to waiting
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        #region eventGeneration
+        public event EventHandler<HerkulexPacketDecodedArgs> OnDataDecodedEvent;
+
+        public virtual void OnDataDecoded(byte packetSize, byte pID, byte cmd, byte checkSum1, byte checkSum2, byte[] packetData)
+        {
+            var handler = OnDataDecodedEvent;
+            if (handler != null)
+            {
+                handler(this, new HerkulexPacketDecodedArgs
+                {
+                    PacketSize = packetSize,
+                    PID = pID,
+                    CMD = cmd,
+                    CheckSum1 = checkSum1,
+                    CheckSum2 = checkSum2,
+                    PacketData = packetData
+                });
+            }
+        }
+        #endregion eventGeneration
+    }
+
+    public enum ErrorStatus
+    {
+        Exceed_input_voltage_limit = 1,
+        Exceed_allowed_pot_limit = 2,
+        Exceed_Temperature_limit = 4,
+        Invalid_packet = 8,
+        Overload_detected = 16,
+        Driver_fault_detected = 32,
+        EEP_REG_distorted = 64,
     }
 
     /// <summary>
@@ -241,7 +371,7 @@ namespace HerkulexController
     /// <summary>
     /// all of the register addrs
     /// </summary>
-    public enum MEM_ADDR
+    public enum RAM_ADDR
     {
         ID = 0,                                 //Byte length: 1
         ACK_Policy = 1,                         //Byte length: 1

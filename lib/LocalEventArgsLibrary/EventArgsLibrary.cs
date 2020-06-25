@@ -17,7 +17,7 @@ namespace LocalEventArgsLibrary
     /// <summary>
     /// HerkulexReceptManager: reception packet decode args
     /// </summary>
-    public class HerkulexIncommingPacketDecodedArgs : EventArgs
+    public class HerkulexPacketDecodedArgs : EventArgs
     {
         public byte PacketSize { get; set; }
         public byte PID { get; set; }

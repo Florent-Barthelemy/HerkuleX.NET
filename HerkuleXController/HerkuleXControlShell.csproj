@@ -54,13 +54,9 @@
       <Project>{21ac599e-e3d5-4181-aa0f-7c2e00cca016}</Project>
       <Name>ExtendedSerialPort</Name>
     </ProjectReference>
-    <ProjectReference Include="..\lib\HerkulexCom\HerkulexSendController.csproj">
+    <ProjectReference Include="..\lib\HerkulexCom\HerkulexController.csproj">
       <Project>{ada2c3ab-18d0-4391-8066-272ab39102aa}</Project>
-      <Name>HerkulexSendController</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\lib\HerkulexReceptManager\HerkulexRecptController.csproj">
-      <Project>{bf6c02fd-e547-4be0-94b5-8f43cd4244b0}</Project>
-      <Name>HerkulexRecptController</Name>
+      <Name>HerkulexController</Name>
     </ProjectReference>
     <ProjectReference Include="..\lib\LocalEventArgsLibrary\LocalEventArgsLibrary.csproj">
       <Project>{630dc6d0-0012-48f2-9eac-0c3c183ce58d}</Project>
