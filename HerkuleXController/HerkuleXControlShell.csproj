@@ -54,7 +54,7 @@
       <Project>{21ac599e-e3d5-4181-aa0f-7c2e00cca016}</Project>
       <Name>ExtendedSerialPort</Name>
     </ProjectReference>
-    <ProjectReference Include="..\lib\HerkulexCom\HerkulexController.csproj">
+    <ProjectReference Include="..\lib\HerkulexController\HerkulexController.csproj">
       <Project>{ada2c3ab-18d0-4391-8066-272ab39102aa}</Project>
       <Name>HerkulexController</Name>
     </ProjectReference>
