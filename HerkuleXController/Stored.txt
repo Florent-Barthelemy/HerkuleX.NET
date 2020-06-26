@@ -1,0 +1,45 @@
+
+        /// <summary>
+        /// returns the memory length at the corresponing address
+        /// </summary>
+        /// <param name="ADDR">address</param>
+        /// <returns></returns>
+        public byte GetMemoryAddrLength(byte ADDR)
+        {
+            foreach (TwoBytesCMD cmd in Enum.GetValues(typeof(TwoBytesCMD)))
+            {
+                if (ADDR == (byte)cmd)
+                {
+                    return 0x02; //if the address belongs to the two bytes length set, return 2, exit func
+                }
+            }
+
+            return 0x01; //if the address does not belongs to the two bytes length set, return 1, exit func
+        }
+
+        /// <summary>
+        /// all of the two bytes length only addresses (use in GetMemoryAddrLength)
+        /// </summary>
+        private enum TwoBytesCMD
+        {
+            Saturator_Slope = 12,                   //Byte length: 2
+            Max_PWM = 16,                           //Byte length: 2
+            Overload_PWM_Threshold = 18,            //Byte length: 2
+            Min_Position = 20,                      //Byte length: 2
+            Max_Position = 22,                      //Byte length: 2
+            Position_Kp = 24,                       //Byte length: 2
+            Position_Kd = 26,                       //Byte length: 2
+            Position_Ki = 28,                       //Byte length: 2
+            Pos_FreeFoward_1st_Gain = 30,           //Byte length: 2
+            Pos_FreeFoward_2nd_Gain = 32,           //Byte length: 2
+            Voltage = 54,                           //Byte length: 2
+            Temperature = 55,                       //Byte length: 2
+            Current_Control_Mode = 56,              //Byte length: 2
+            Tick = 57,                              //Byte length: 2
+            Calibrated_Position = 58,               //Byte length: 2
+            Absolute_Position = 60,                 //Byte length: 2
+            Differential_Position = 62,             //Byte length: 2
+            PWM = 64,                               //Byte length: 2
+            Absolute_Goal_Position = 68,            //Byte length: 2
+            Absolute_Desired_Traject_Pos = 70,      //Byte length: 2
+        }
