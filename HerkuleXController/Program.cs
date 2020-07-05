@@ -8,6 +8,7 @@ using System.IO.Ports;
 using HerkulexController;
 using ExtendedSerialPort;
 using System.Threading;
+using System.Diagnostics;
 
 namespace HerkuleXControlShell
 {
@@ -18,9 +19,8 @@ namespace HerkuleXControlShell
         static HklxDecoder HrDecoder = new HklxDecoder();
 
         //floating servo config
-        static IJOG_TAG floatingConfig = new IJOG_TAG
+        static JOG_TAG floatingConfig = new JOG_TAG
         {
-            ID = 0x50,
             mode = JOG_MODE.positionControlJOG,
             playTime = 10,
             LED_BLUE = 0,
@@ -29,15 +29,43 @@ namespace HerkuleXControlShell
             JOG = 300
         };
 
+        static JOG_TAG Ser1Config = new JOG_TAG
+        {
+            mode = JOG_MODE.positionControlJOG,
+            ID = 1,
+            playTime = 60,
+            LED_BLUE = 1,
+            LED_RED = 0,
+            LED_GREEN = 0,
+            JOG = 512
+        };
+
+        static JOG_TAG Ser2Config = new JOG_TAG
+        {
+            mode = JOG_MODE.positionControlJOG,
+            ID = 2,
+            playTime = 10,
+            LED_BLUE = 1,
+            LED_RED = 1,
+            LED_GREEN = 0,
+            JOG = 512
+        };
+
+        static List<JOG_TAG> ROBOT_ARM_CONFIG;
+
         static bool lockShell = true;
-        static byte currentErrorStatus;
 
         static void Main(string[] args)
         {
 
             ComPort.DataReceived += HrDecoder.DecodePacket;
-            HrDecoder.OnDataDecodedEvent += HrDecoder_OnDataDecodedEvent;
-            HrDecoder.OnStatusErrorFromAckEvent += HrDecoder_OnStatusErrorFromAckEvent;
+            ComPort.DataReceived += ComPort_DataReceived;
+            HrDecoder.OnDataDecodedEvent += HrDecoder.ProcessPacket;
+            HrDecoder.OnStatAckEvent += HrDecoder_OnStatAckEvent;
+            HrDecoder.OnIjogAckEvent += HrDecoder_OnIjogAckEvent;
+            HrDecoder.OnSjogAckEvent += HrDecoder_OnSjogAckEvent;
+            HrDecoder.OnRamReadAckEvent += HrDecoder_OnRamReadAckEvent;
+            HrDecoder.OnEepReadAckEvent += HrDecoder_OnEepReadAckEvent;
 
             ComPort.Open();
 
@@ -48,6 +76,60 @@ namespace HerkuleXControlShell
 
                 switch(parsedCmd[0])
                 {
+                    case "REBOOT":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("REBOOT <pID>");
+                        else
+                            HrController.REBOOT(ComPort, Convert.ToByte(parsedCmd[1]));
+                        break;
+                    case "ROOLBACK":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("ROLLBACK <ID>");
+                        else
+                            HrController.ROLLBACK(ComPort, Convert.ToByte(parsedCmd[1]));
+                        break;
+
+                    case "EEP_WRITE":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("EEP_WRITE <pID> <StartAddr> <Length> <DataDecimal>");
+                        else
+                            HrController.EEP_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]),
+                                                  Convert.ToByte(parsedCmd[3]), Convert.ToUInt16(parsedCmd[4]));
+                        break;
+
+                    case "EEP_READ":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("EEP_READ <pID> <StartAddr> <Length>");
+                        else
+                            HrController.EEP_READ(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
+                        break;
+
+                    case "STAT":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("STAT <pID>");
+                        else
+                            HrController.STAT(ComPort, Convert.ToByte(parsedCmd[1]));
+                        break;
+
+                    //for testing incredible things
+                    case "debug":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("debug <JOG1> <JOG2>");
+                        else
+                        {
+                            Ser1Config.JOG = Convert.ToUInt16(parsedCmd[1]);
+                            Ser2Config.JOG = Convert.ToUInt16(parsedCmd[2]);
+                            
+                            ROBOT_ARM_CONFIG = new List<JOG_TAG>
+                             {
+                                 Ser1Config,
+                                 Ser2Config
+                             };
+
+                            HrController.S_JOG(ComPort, ROBOT_ARM_CONFIG, 0x3C);
+                        }
+                        break;
+
                     //implemented, working
                     case "moveto":
                         if (parsedCmd.Length == 1)
@@ -56,7 +138,16 @@ namespace HerkuleXControlShell
                         {
                             floatingConfig.ID = Convert.ToByte(parsedCmd[1]);
                             floatingConfig.JOG = Convert.ToUInt16(parsedCmd[2]);
-                            HrController.I_JOG(ComPort, floatingConfig);
+                            HrController.S_JOG(ComPort, floatingConfig, 10);
+                        }
+                        break;
+
+                    case "GetPos":
+                        if (parsedCmd.Length == 1)
+                            Console.WriteLine("GetPos <pID>");
+                        else
+                        {
+                            HrController.RAM_READ(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Absolute_Position, 2);
                         }
                         break;
 
@@ -96,12 +187,12 @@ namespace HerkuleXControlShell
 
                     case "initPos":
                         floatingConfig.ID = 1;
-                        floatingConfig.JOG = 300;
+                        floatingConfig.JOG = 512;
                         floatingConfig.playTime = 100;
                         HrController.I_JOG(ComPort, floatingConfig); 
 
                         floatingConfig.ID = 2;
-                        floatingConfig.JOG = 500;
+                        floatingConfig.JOG = 512;
                         floatingConfig.playTime = 100;
                         HrController.I_JOG(ComPort, floatingConfig);
                         break;
@@ -136,47 +227,6 @@ namespace HerkuleXControlShell
                         Console.WriteLine("connect");
                         break;
 
-                    case "CheckErrors":
-                        if (parsedCmd.Length == 1)
-                            Console.WriteLine("CheckErrors <pID>");
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-
-                            HrController.RAM_READ(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Status_Error, 1);
-                        List<ErrorStatus> StatusErrors = CommonMethods.GetErrorStatusFromByte(currentErrorStatus);
-
-                            foreach (ErrorStatus err in StatusErrors)
-                            {
-                                if (err == ErrorStatus.Driver_fault_detected)
-                                    Console.Write("Driver fault Detected, ");
-
-                                else if (err == ErrorStatus.EEP_REG_distorted)
-                                    Console.Write("EEP Reg Distorted, ");
-
-                                else if (err == ErrorStatus.Exceed_allowed_pot_limit)
-                                    Console.Write("Allowed pot limit Exceeded, ");
-
-                                else if (err == ErrorStatus.Exceed_input_voltage_limit)
-                                    Console.Write("Input Voltage exceeds policy, ");
-
-                                else if (err == ErrorStatus.Exceed_Temperature_limit)
-                                    Console.Write("Max temperature Exceeded, ");
-
-                                else if (err == ErrorStatus.Invalid_packet)
-                                    Console.Write("Packet invalid, ");
-
-                                else if (err == ErrorStatus.Overload_detected)
-                                    Console.Write("Servo Overload");
-                                else
-                                    Console.Write("No errors");
-                            }
-                        
-                        }
-
-                        Console.ForegroundColor = ConsoleColor.White;
-                        break;
-
                     case "ResolveErrs":
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("ResolveErrs <pID>");
@@ -195,43 +245,50 @@ namespace HerkuleXControlShell
             }
         }
 
-        private static void HrDecoder_OnDataDecodedEvent(object sender, HklxPacketDecodedArgs e)
+        private static void ComPort_DataReceived(object sender, LocalEventArgsLibrary.DataReceivedArgs e)
         {
-            if(e.CMD == (byte)CommandAckSet.ack_RAM_READ)
-            {
-                currentErrorStatus = e.PacketData[2];
-            }
+           
         }
 
-        private static void HrDecoder_OnStatusErrorFromAckEvent(object sender, HklxStatusErrorFromAckArgs e)
+        private static void HrDecoder_OnRamReadAckEvent(object sender, Hklx_RAM_READ_Ack_Args e)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
+            int errCount = e.StatusErrors.Count;
+            Console.WriteLine("RAM_READ ACK RECEIVED, Got " + errCount + " error(s)\nStart Address : " + e.Address + "\nLength : " + e.Length + "\n");
+            Console.Write("DATA: ");
+            foreach (byte b in e.ReceivedData)
+                Console.Write(b.ToString("X2") + " ");
 
-            foreach(ErrorStatus err in e.StatusErrors)
-            {
-                if (err == ErrorStatus.Driver_fault_detected)
-                    Console.Write("Driver fault Detected, ");
+            Console.WriteLine();
+        }
 
-                if(err == ErrorStatus.EEP_REG_distorted)
-                    Console.Write("EEP Reg Distorted, ");
+        private static void HrDecoder_OnEepReadAckEvent(object sender, Hklx_EEP_READ_Ack_Args e)
+        {
+            int errCount = e.StatusErrors.Count;
+            Console.WriteLine("EEP_READ ACK RECEIVED, Got " + errCount + " error(s)\nStart Address : " + e.Address + "\nLength : " + e.Length + "\n");
+            Console.Write("DATA: ");
+            foreach (byte b in e.ReceivedData)
+                Console.Write(b.ToString("X2") + " ");
 
-                if (err == ErrorStatus.Exceed_allowed_pot_limit)
-                    Console.Write("Allowed pot limit Exceeded, ");
+            Console.WriteLine();
+        }
 
-                if (err == ErrorStatus.Exceed_input_voltage_limit)
-                    Console.Write("Input Voltage exceeds policy, ");
+        private static void HrDecoder_OnSjogAckEvent(object sender, Hklx_S_JOG_Ack_Args e)
+        {
+            int errCount = e.StatusErrors.Count;
+            Console.WriteLine("S_JOG ACK RECEIVED, Got " + errCount + " error(s)");
+        }
 
-                if (err == ErrorStatus.Exceed_Temperature_limit)
-                    Console.Write("Max temperature Exceeded, ");
+        private static void HrDecoder_OnIjogAckEvent(object sender, Hklx_I_JOG_Ack_Args e)
+        {
+            int errCount = e.StatusErrors.Count;
+            Console.WriteLine("I_JOG ACK RECEIVED, Got " + errCount + " error(s)");
+        }
 
-                if (err == ErrorStatus.Invalid_packet)
-                    Console.Write("Packet invalid, ");
-
-                if (err == ErrorStatus.Overload_detected)
-                    Console.Write("Servo Overload");
-            }
-
-            Console.ForegroundColor = ConsoleColor.White;
+        private static void HrDecoder_OnStatAckEvent(object sender, Hklx_STAT_Ack_Args e)
+        {
+            int errCount = e.StatusErrors.Count;
+            List<ErrorStatus> errs = e.StatusErrors;
+            Console.WriteLine("STAT ACK RECEIVED, Got " + errCount + " error(s)");
         }
 
         private static string[] ParseShellCmd(string cmd)
