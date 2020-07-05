@@ -1,9 +1,7 @@
 # HerkuleX.NET, a C# written library to manage Herkulex DRS servos via a serial port
----
 This library allows control over Herkulex DRS Servos via a serial port in C# based applications.
 The decoder makes use of the [ReliableSerialPort](https://www.vgies.com/a-reliable-serial-port-in-c/ "ReliableSerialPort page") class.
 ## Implemented
----
 #### JOG tags and moving servos
 The JOG tag structure allows the user to declare a servo's configuration.
 In the ```JOG_MODE.infiniteTurn mode```, ```tag.JOG``` corresponds to the PWM.
