@@ -1,5 +1,5 @@
 # HerkuleX.NET, a C# written library to manage Herkulex DRS servos via a serial port
-This library allows control over Herkulex DRS Servos via a serial port in C# based applications.
+This library allows control over Herkulex DRS Servos via a serial port in C# .NET based applications.
 The decoder makes use of the [ReliableSerialPort](https://www.vgies.com/a-reliable-serial-port-in-c/ "ReliableSerialPort page") class.
 ## Implemented ![](https://img.icons8.com/officexs/2x/ok.png)
 #### JOG tags and moving servos
