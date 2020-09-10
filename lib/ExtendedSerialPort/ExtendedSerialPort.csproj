@@ -50,11 +50,5 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\LocalEventArgsLibrary\LocalEventArgsLibrary.csproj">
-      <Project>{630dc6d0-0012-48f2-9eac-0c3c183ce58d}</Project>
-      <Name>LocalEventArgsLibrary</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

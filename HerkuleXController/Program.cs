@@ -2,18 +2,23 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.IO.Ports;
-
-using HerkulexController;
+using HerkulexControl;
 using ExtendedSerialPort;
-using System.Threading;
+using System.Windows.Threading;
+using SharpDX.XInput;
 using System.Diagnostics;
+using System.Windows.Forms.VisualStyles;
+using SharpDX;
+using System.Threading;
+using System.Windows.Forms;
+using System.Timers;
 
 namespace HerkuleXControlShell
 {
     class Program
     {
+        
         static ReliableSerialPort ComPort = new ReliableSerialPort("COM7", 115200, Parity.None, 8, StopBits.One);
         static HklxController HrController = new HklxController();
         static HklxDecoder HrDecoder = new HklxDecoder();
@@ -57,20 +62,21 @@ namespace HerkuleXControlShell
 
         static void Main(string[] args)
         {
+            HrController.port = ComPort;
 
             ComPort.DataReceived += HrDecoder.DecodePacket;
-            ComPort.DataReceived += ComPort_DataReceived;
+
             HrDecoder.OnDataDecodedEvent += HrDecoder.ProcessPacket;
             HrDecoder.OnStatAckEvent += HrDecoder_OnStatAckEvent;
             HrDecoder.OnIjogAckEvent += HrDecoder_OnIjogAckEvent;
             HrDecoder.OnSjogAckEvent += HrDecoder_OnSjogAckEvent;
             HrDecoder.OnRamReadAckEvent += HrDecoder_OnRamReadAckEvent;
             HrDecoder.OnEepReadAckEvent += HrDecoder_OnEepReadAckEvent;
-
             ComPort.Open();
 
             while (lockShell)
             {
+                
                 Console.Write('>');
                 string[] parsedCmd = ParseShellCmd(Console.ReadLine());
 
@@ -80,20 +86,20 @@ namespace HerkuleXControlShell
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("REBOOT <pID>");
                         else
-                            HrController.REBOOT(ComPort, Convert.ToByte(parsedCmd[1]));
+                            HrController.REBOOT(Convert.ToByte(parsedCmd[1]));
                         break;
                     case "ROOLBACK":
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("ROLLBACK <ID>");
                         else
-                            HrController.ROLLBACK(ComPort, Convert.ToByte(parsedCmd[1]));
+                            HrController.ROLLBACK(Convert.ToByte(parsedCmd[1]));
                         break;
 
                     case "EEP_WRITE":
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("EEP_WRITE <pID> <StartAddr> <Length> <DataDecimal>");
                         else
-                            HrController.EEP_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]),
+                            HrController.EEP_WRITE(Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]),
                                                   Convert.ToByte(parsedCmd[3]), Convert.ToUInt16(parsedCmd[4]));
                         break;
 
@@ -101,14 +107,14 @@ namespace HerkuleXControlShell
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("EEP_READ <pID> <StartAddr> <Length>");
                         else
-                            HrController.EEP_READ(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
+                            HrController.EEP_READ(Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
                         break;
 
                     case "STAT":
                         if (parsedCmd.Length == 1)
                             Console.WriteLine("STAT <pID>");
                         else
-                            HrController.STAT(ComPort, Convert.ToByte(parsedCmd[1]));
+                            HrController.STAT(Convert.ToByte(parsedCmd[1]));
                         break;
 
                     //for testing incredible things
@@ -126,7 +132,7 @@ namespace HerkuleXControlShell
                                  Ser2Config
                              };
 
-                            HrController.S_JOG(ComPort, ROBOT_ARM_CONFIG, 0x3C);
+                            HrController.S_JOG(ROBOT_ARM_CONFIG, 0x3C);
                         }
                         break;
 
@@ -138,7 +144,7 @@ namespace HerkuleXControlShell
                         {
                             floatingConfig.ID = Convert.ToByte(parsedCmd[1]);
                             floatingConfig.JOG = Convert.ToUInt16(parsedCmd[2]);
-                            HrController.S_JOG(ComPort, floatingConfig, 10);
+                            HrController.S_JOG(floatingConfig, 10);
                         }
                         break;
 
@@ -147,7 +153,7 @@ namespace HerkuleXControlShell
                             Console.WriteLine("GetPos <pID>");
                         else
                         {
-                            HrController.RAM_READ(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Absolute_Position, 2);
+                            HrController.RAM_READ(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Absolute_Position, 2);
                         }
                         break;
 
@@ -158,11 +164,11 @@ namespace HerkuleXControlShell
                         else
                         {
                             if(parsedCmd[2] == "TRK_ON")
-                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x60);
+                                HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x60);
                             if (parsedCmd[2] == "BRK_ON")
-                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x40);
+                                HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x40);
                             if (parsedCmd[2] == "TRK_FREE")
-                                HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x00);
+                                HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x00);
                         }
                         break;
 
@@ -171,7 +177,7 @@ namespace HerkuleXControlShell
                             Console.WriteLine("RAM_READ <pID> <StartAddr> <Length>");
                         else
                         {
-                            HrController.RAM_READ(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
+                            HrController.RAM_READ(Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]), Convert.ToByte(parsedCmd[3]));
                         }
                         break;
 
@@ -180,7 +186,7 @@ namespace HerkuleXControlShell
                             Console.WriteLine("RAM_WRITE <pID> <StartAddr> <Length> <Value> {ADDR 48 / 49 for error status}");
                         else
                         {
-                            HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]),
+                            HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), Convert.ToByte(parsedCmd[2]),
                                                    Convert.ToByte(parsedCmd[3]), Convert.ToUInt16(parsedCmd[4]));
                         }
                         break;
@@ -189,22 +195,22 @@ namespace HerkuleXControlShell
                         floatingConfig.ID = 1;
                         floatingConfig.JOG = 512;
                         floatingConfig.playTime = 100;
-                        HrController.I_JOG(ComPort, floatingConfig); 
+                        HrController.I_JOG(floatingConfig); 
 
                         floatingConfig.ID = 2;
                         floatingConfig.JOG = 512;
                         floatingConfig.playTime = 100;
-                        HrController.I_JOG(ComPort, floatingConfig);
+                        HrController.I_JOG(floatingConfig);
                         break;
 
                     case "allFree":
-                        HrController.RAM_WRITE(ComPort, 1, (byte)RAM_ADDR.Torque_Control, 1, 0x00);
-                        HrController.RAM_WRITE(ComPort, 2, (byte)RAM_ADDR.Torque_Control, 1, 0x00);
+                        HrController.RAM_WRITE(1, (byte)RAM_ADDR.Torque_Control, 1, 0x00);
+                        HrController.RAM_WRITE(2, (byte)RAM_ADDR.Torque_Control, 1, 0x00);
                         break;
 
                     case "allOn":
-                        HrController.RAM_WRITE(ComPort, 1, (byte)RAM_ADDR.Torque_Control, 1, 0x60);
-                        HrController.RAM_WRITE(ComPort, 2, (byte)RAM_ADDR.Torque_Control, 1, 0x60);
+                        HrController.RAM_WRITE(1, (byte)RAM_ADDR.Torque_Control, 1, 0x60);
+                        HrController.RAM_WRITE(2, (byte)RAM_ADDR.Torque_Control, 1, 0x60);
                         break;
 
                     case "disconnect":
@@ -232,8 +238,8 @@ namespace HerkuleXControlShell
                             Console.WriteLine("ResolveErrs <pID>");
                         else
                         {
-                            HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Status_Error, 1, 0x00);
-                            HrController.RAM_WRITE(ComPort, Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x60);
+                            HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Status_Error, 1, 0x00);
+                            HrController.RAM_WRITE(Convert.ToByte(parsedCmd[1]), (byte)RAM_ADDR.Torque_Control, 1, 0x60);
                         }
                         break;
 
@@ -245,10 +251,6 @@ namespace HerkuleXControlShell
             }
         }
 
-        private static void ComPort_DataReceived(object sender, LocalEventArgsLibrary.DataReceivedArgs e)
-        {
-           
-        }
 
         private static void HrDecoder_OnRamReadAckEvent(object sender, Hklx_RAM_READ_Ack_Args e)
         {

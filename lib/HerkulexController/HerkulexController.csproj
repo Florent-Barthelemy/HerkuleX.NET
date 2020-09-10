@@ -7,7 +7,7 @@
     <ProjectGuid>{ADA2C3AB-18D0-4391-8066-272AB39102AA}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>HerkulexCom</RootNamespace>
+    <RootNamespace>HerkulexControl</RootNamespace>
     <AssemblyName>HerkulexCom</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -41,13 +41,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="HerkulexDecoder.cs" />
     <Compile Include="HerkulexController.cs" />
+    <Compile Include="HerkulexDescription.cs" />
+    <Compile Include="HerkulexEventArgs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="CommonMethods.cs" />
+    <Compile Include="Servo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LocalEventArgsLibrary\LocalEventArgsLibrary.csproj">
-      <Project>{630dc6d0-0012-48f2-9eac-0c3c183ce58d}</Project>
-      <Name>LocalEventArgsLibrary</Name>
+    <ProjectReference Include="..\ExtendedSerialPort\ExtendedSerialPort.csproj">
+      <Project>{21ac599e-e3d5-4181-aa0f-7c2e00cca016}</Project>
+      <Name>ExtendedSerialPort</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

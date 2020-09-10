@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO.Ports;
-using LocalEventArgsLibrary;
 
 namespace ExtendedSerialPort
 {
@@ -50,5 +49,13 @@ namespace ExtendedSerialPort
                 handler(this, new DataReceivedArgs { Data = data });
             }
         }
+    }
+
+    /// <summary>
+    /// ReliableSerialPort: data received args
+    /// </summary>
+    public class DataReceivedArgs : EventArgs
+    {
+        public byte[] Data { get; set; }
     }
 }
