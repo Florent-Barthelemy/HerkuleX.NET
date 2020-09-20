@@ -8,7 +8,10 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.Remoting.Channels;
 using System.Threading;
+using System.Timers;
+//using System.Threading;
 using System.Xml.Schema;
+using Timer = System.Timers.Timer;
 
 
 
@@ -31,52 +34,97 @@ namespace HerkulexControl
 {
     public class HerkulexController
     {
+        
+
+        //events, autoreset
         public event EventHandler<InfosUpdatedArgs> InfosUpdatedEvent;
+        public event EventHandler<HerkulexErrorArgs> HerkulexErrorEvent;
+
+        //internal events
+        private ManualResetEvent PollingTimerThreadBlock = new ManualResetEvent(false);
+        private AutoResetEvent MessageEnqueuedEvent = new AutoResetEvent(false);
+        private AutoResetEvent RamReadAckReceivedEvent = new AutoResetEvent(false);
+        private AutoResetEvent RamWriteAckReceivedEvent = new AutoResetEvent(false);
+        private AutoResetEvent IjogAckReceivedEvent = new AutoResetEvent(false);
+        private AutoResetEvent SjogAckReceivedEvent = new AutoResetEvent(false);
 
         private ReliableSerialPort serialPort { get; set; }
         private HerkulexDecoder decoder;
 
+        //dictionaries, queues
         private Dictionary<byte, Servo> Servos = new Dictionary<byte, Servo>();
-        private Timer pollingTimer;
+        //private Dictionary<byte, Servo> SyncServoBuffer = new Dictionary<byte, Servo>();
+        private Queue<byte[]> FrameQueue = new Queue<byte[]>();
 
-        private ManualResetEvent pause = new ManualResetEvent(false);
+        //timers, threads
+        private System.Threading.Timer PollingTimer;
+        private Thread DequeueThread;
+
+        //default values
+        public bool AutoRecoverMode = false;
+        private byte SynchronousPlaytime = 50;
+        private int PollingInterval = 100;
+        private int AckTimeout = 50;
+
 
         public HerkulexController(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
         {
             serialPort = new ReliableSerialPort(portName, baudRate, parity, dataBits, stopBits);
             decoder = new HerkulexDecoder();
-            serialPort.DataReceived += decoder.DecodePacket;
-            decoder.OnDataDecodedEvent += decoder.ProcessPacket;
 
+            DequeueThread = new Thread(new ThreadStart(DequeueFrames));
+
+            DequeueThread.Start();
+
+            serialPort.DataReceived += decoder.DecodePacket;
             decoder.OnRamReadAckEvent += Decoder_OnRamReadAckEvent;
+            decoder.OnRamWriteAckEvent += Decoder_OnRamWriteAckEvent;
+            decoder.OnIjogAckEvent += Decoder_OnIjogAckEvent;
+            decoder.OnSjogAckEvent += Decoder_OnSjogAckEvent;
+
             serialPort.Open();
 
-            //10Hz by default
-            pollingTimer = new Timer((t) =>
+            PollingTimer = new System.Threading.Timer((c) =>
             {
-                pause.WaitOne(); //blocks the thread if pause.set()
-                foreach(KeyValuePair<byte, Servo> IdServoPair in Servos)
-                {
-                    I_JOG(IdServoPair.Value);
-
-                    //asking for basic servo stats (flags and errors)
+                PollingTimerThreadBlock.WaitOne();
+                foreach (KeyValuePair<byte, Servo> IdServoPair in Servos)
                     RAM_READ(IdServoPair.Key, HerkulexDescription.RAM_ADDR.Absolute_Position, 2);
-                    STAT(IdServoPair.Key);
-                }
-            }, null, 0, 100);
-           
+
+            }, null, 0, PollingInterval);
         }
 
+        // ram write ack event
+        private void Decoder_OnRamWriteAckEvent(object sender, Hklx_RAM_WRITE_Ack_Args e)
+        {
+            RamWriteAckReceivedEvent.Set();
+        }
+
+        //Sjog ack
+        private void Decoder_OnSjogAckEvent(object sender, Hklx_S_JOG_Ack_Args e)
+        {
+            SjogAckReceivedEvent.Set();
+        }
+
+        //Ijog ack
+        private void Decoder_OnIjogAckEvent(object sender, Hklx_I_JOG_Ack_Args e)
+        {
+            IjogAckReceivedEvent.Set();
+        }
+
+        //poll (ram read) ack
         private void Decoder_OnRamReadAckEvent(object sender, Hklx_RAM_READ_Ack_Args e)
         {
             Servo pulledServo = null;
             UInt16 actualAbsolutePosition = 0;
             if (Servos.ContainsKey(e.PID))
             {
+                RamReadAckReceivedEvent.Set();
+
                 actualAbsolutePosition = (ushort)(e.ReceivedData[1] << 8);
                 actualAbsolutePosition += (ushort)(e.ReceivedData[0] << 0);
 
                 Servos.TryGetValue(e.PID, out pulledServo);
+                //getting flags and error details
                 pulledServo.IsMoving = (e.StatusDetails.Contains(HerkulexDescription.ErrorStatusDetail.Moving_flag) ? (true) : (false));
                 pulledServo.IsInposition = (e.StatusDetails.Contains(HerkulexDescription.ErrorStatusDetail.Inposition_flag) ? (true) : (false));
                 pulledServo.IsMotorOn = (e.StatusDetails.Contains(HerkulexDescription.ErrorStatusDetail.MOTOR_ON_flag) ? (true) : (false));
@@ -85,10 +133,88 @@ namespace HerkulexControl
                 pulledServo.ExceedRegRangeError = (e.StatusDetails.Contains(HerkulexDescription.ErrorStatusDetail.Exceed_REG_RANGE) ? (true) : (false));
                 pulledServo.GarbageDetectedError = (e.StatusDetails.Contains(HerkulexDescription.ErrorStatusDetail.Garbage_detected) ? (true) : (false));
                 pulledServo.ActualAbsolutePosition = actualAbsolutePosition;
+
+                //getting errors
+                pulledServo.Exceed_input_voltage_limit = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Exceed_input_voltage_limit)) ? (true) : (false);
+                pulledServo.Exceed_allowed_pot_limit = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Exceed_allowed_pot_limit)) ? (true) : (false);
+                pulledServo.Exceed_Temperature_limit = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Exceed_Temperature_limit)) ? (true) : (false);
+                pulledServo.Invalid_packet = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Invalid_packet)) ? (true) : (false);
+                pulledServo.Overload_detected = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Overload_detected)) ? (true) : (false);
+                pulledServo.Driver_fault_detected = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.Driver_fault_detected)) ? (true) : (false);
+                pulledServo.EEP_REG_distorted = (e.StatusErrors.Contains(HerkulexDescription.ErrorStatus.EEP_REG_distorted)) ? (true) : (false);
+
+                //if any error flag is true, set HerkulexErrorEvent
+                if (pulledServo.Exceed_input_voltage_limit == true ||
+                    pulledServo.Exceed_allowed_pot_limit == true ||
+                    pulledServo.Exceed_Temperature_limit == true ||
+                    pulledServo.Invalid_packet == true ||
+                    pulledServo.Overload_detected == true ||
+                    pulledServo.Driver_fault_detected == true ||
+                    pulledServo.EEP_REG_distorted == true)
+                {
+                    OnHerkulexError(pulledServo);
+                    if (AutoRecoverMode == true)
+                        RecoverErrors(pulledServo);
+                }
                 OnInfosUpdated(pulledServo);
+               
             }
         }
 
+        //dequeuing in a thread
+        private void DequeueFrames()
+        {
+            while(true)
+            {
+                //timeout to avoid blocking the thread if MessageEnqueuedEvent does not set [WaitOne() for optimization]
+                MessageEnqueuedEvent.WaitOne(50); 
+                if (FrameQueue.Count > 0)
+                  for(int i = 0; i < FrameQueue.Count; i++)
+                  {
+                        byte[] packet = FrameQueue.Dequeue();
+                        if (packet != null)
+                        {
+                            serialPort.Write(packet, 0, packet.Length);
+                            switch (packet[4])
+                            {
+                                case (byte)HerkulexDescription.CommandSet.RAM_READ:
+                                    RamReadAckReceivedEvent.WaitOne(AckTimeout);
+                                    break;
+
+                                case (byte)HerkulexDescription.CommandSet.RAM_WRITE:
+                                    RamWriteAckReceivedEvent.WaitOne(AckTimeout);
+                                    break;
+
+                                case (byte)HerkulexDescription.CommandSet.I_JOG:
+                                    IjogAckReceivedEvent.WaitOne(AckTimeout);
+                                    break;
+
+                                case (byte)HerkulexDescription.CommandSet.S_JOG:
+                                    SjogAckReceivedEvent.WaitOne(AckTimeout);
+                                    break;
+
+                                default:
+                                    break;
+                            }
+                        }
+                  }
+            }
+        }
+
+        /// <summary>
+        /// Recovers the servo from error state
+        /// </summary>
+        /// <param name="servo">Servo instance</param>
+        public void RecoverErrors(Servo servo)
+        {
+            ClearAllErrors(servo.GetID());
+            SetTorqueMode(servo.GetID(), HerkulexDescription.TorqueControl.TorqueOn);
+        }
+
+        /// <summary>
+        /// Servo polled event
+        /// </summary>
+        /// <param name="servo"></param>
         public virtual void OnInfosUpdated(Servo servo)
         {
             var handler = InfosUpdatedEvent;
@@ -101,28 +227,67 @@ namespace HerkulexControl
             }
         }
 
+        /// <summary>
+        /// Error occured event
+        /// </summary>
+        /// <param name="servo"></param>
+        public virtual void OnHerkulexError(Servo servo)
+        {
+            //Ne doit être appelé que si il y a une erreur
+            var handler = HerkulexErrorEvent;
+            if (handler != null)
+            {
+                handler(this, new HerkulexErrorArgs
+                {
+                    Servo = servo
+                });
+            }
+        }
+
+        /// <summary>
+        /// Sets the polling frequency
+        /// </summary>
+        /// <param name="freq">Frequency</param>
         public void SetPollingFreq(int freq)
         {
-            pollingTimer.Change(0, (int)(1.0 / freq * 1000));
+            PollingTimer.Change(0, (int)((1.0 / freq) * 1000));
         }
 
-        public void PausePolling()
+        /// <summary>
+        /// Starts polling
+        /// </summary>
+        public void StartPolling()
         {
-            pause.Reset();
+            PollingTimerThreadBlock.Set();
         }
 
-        public void ResumePolling()
+        /// <summary>
+        /// Stops Polling
+        /// </summary>
+        public void StopPolling()
         {
-            pause.Set();
+            PollingTimerThreadBlock.Reset();
         }
 
-        public void AddServo(byte ID, HerkulexDescription.JOG_MODE mode)
+        /// <summary>
+        /// Adds a servo to the controller
+        /// </summary>
+        /// <param name="ID">Servo ID</param>
+        /// <param name="mode">JOG mode</param>
+        public void AddServo(byte ID, HerkulexDescription.JOG_MODE mode, UInt16 initialPosition)
         {
             Servo servo = new Servo(ID, mode);
             Servos.Add(ID, servo);
+            Servos[ID].SetAbsolutePosition(initialPosition);
+            //reply to all packets
+            RAM_WRITE(ID, HerkulexDescription.RAM_ADDR.ACK_Policy, 1, 0x02);
+            RecoverErrors(servo);
         }
 
-        //asynchronously clears errors (immediate  effect)
+        /// <summary>
+        /// asynchronously clears all flags and errors on the servo (no matter the polling state)
+        /// </summary>
+        /// <param name="ID">Servo ID</param>
         public void ClearErrors(byte ID)
         {
             if (Servos.ContainsKey(ID))
@@ -130,8 +295,21 @@ namespace HerkulexControl
             else
                 throw new Exception("The servo ID is not in the dictionary");
         }
-        
-        //asynchronously sets the torque mode (immediate effect)
+
+        /// <summary>
+        /// Sets the servo acknowledge timeout
+        /// </summary>
+        /// <param name="TimeoutMs">Timeout in ms</param>
+        public void SetAckTimeout(int TimeoutMs)
+        {
+            AckTimeout = TimeoutMs;
+        }
+
+        /// <summary>
+        /// Sets the torque mode on the servo
+        /// </summary>
+        /// <param name="ID">Servo ID</param>
+        /// <param name="mode">Torque mode</param>
         public void SetTorqueMode(byte ID, HerkulexDescription.TorqueControl mode)
         {
             if(Servos.ContainsKey(ID))
@@ -140,31 +318,60 @@ namespace HerkulexControl
                 throw new Exception("The servo ID is not in the dictionary");
         }
 
+        /// <summary>
+        /// Changes the servo led color
+        /// </summary>
+        /// <param name="ID">Servo ID</param>
+        /// <param name="color">Led color</param>
         public void SetLedColor(byte ID, HerkulexDescription.LedColor color)
         {
-            Servo pulledServo = null;
             if (Servos.ContainsKey(ID))
             {
-                Servos.TryGetValue(ID, out pulledServo);
-                pulledServo.SetLedColor(color);
+                Servos[ID].SetLedColor(color);
+                _SetLedColor(ID, color);
             }
             else
                 throw new Exception("The servo ID is not in the dictionnary");
         }
 
-        public void SetPosition(byte ID, ushort absolutePosition, byte playTime)
+        /// <summary>
+        /// Sets the target absolute position of the servo
+        /// </summary>
+        /// <param name="ID">Servo ID</param>
+        /// <param name="absolutePosition">Absolute position</param>
+        /// <param name="playTime">Playtime</param>
+        public void SetPosition(byte ID, ushort absolutePosition, byte playTime, bool IsSynchronous = false)
         {
-            Servo pulledServo = null;
             if (Servos.ContainsKey(ID))
             {
-                Servos.TryGetValue(ID, out pulledServo);
-                pulledServo.SetAbsolutePosition(absolutePosition);
-                pulledServo.SetPlayTime(playTime);
+                Servos[ID].SetAbsolutePosition(absolutePosition);
+                Servos[ID].SetPlayTime(playTime);
+
+                if (IsSynchronous)
+                {
+                    Servos[ID].IsNextOrderSynchronous = true; //On clear le flag à l'envoi synchrone
+                }
+                else
+                {
+                    foreach (KeyValuePair<byte, Servo> IdServoPair in Servos)
+                    {
+                        I_JOG(IdServoPair.Value);
+                        IdServoPair.Value.IsNextOrderSynchronous = false;
+                    }
+                }
             }
             else
                 throw new Exception("The servo ID is not in the dictionnary");
         }
 
+        /// <summary>
+        /// Sends the synchronous servo buffer
+        /// </summary>
+        public void SendSynchronous(byte playtime)
+        {
+            SynchronousPlaytime = playtime;
+            S_JOG(Servos, SynchronousPlaytime);
+        }
 
         #region LowLevelMethods
         /// <summary>
@@ -454,23 +661,45 @@ namespace HerkulexControl
         }
 
         /// <summary>
-        /// Sends a list of JOG tags with sync playtime (TAG.playTime is ignored)
+        /// 
         /// </summary>
-        /// <param name="port">Serial port to use</param>
-        /// <param name="TAGS">List of JOG tags</param>
-        private void S_JOG(List<HerkulexDescription.JOG_TAG> TAGS, byte playTime)
+        /// <param name="servos"></param>
+        /// <param name="playTime"></param>
+        private void S_JOG(List<Servo> servos, byte playTime)
         {
-            byte[] dataToSend = new byte[1 + 4 * TAGS.Count];
+            byte[] dataToSend = new byte[1 + 4 * servos.Count];
             dataToSend[0] = playTime;
             byte dataOffset = 1;
 
-            foreach(HerkulexDescription.JOG_TAG TAG in TAGS)
+            foreach(Servo servo in servos)
             {
-                dataToSend[dataOffset + 0] = (byte)(TAG.JOG >> 0);
-                dataToSend[dataOffset + 1] = (byte)(TAG.JOG >> 8);
-                dataToSend[dataOffset + 2] = TAG.SET;
-                dataToSend[dataOffset + 3] = TAG.ID;
+                dataToSend[dataOffset + 0] = (byte)(servo.GetTargetAbsolutePosition() >> 0);
+                dataToSend[dataOffset + 1] = (byte)(servo.GetTargetAbsolutePosition() >> 8);
+                dataToSend[dataOffset + 2] = servo.GetSETByte();
+                dataToSend[dataOffset + 3] = servo.GetID();
                 dataOffset += 4;
+            }
+
+            EncodeAndSendPacket(serialPort, 0xFE, (byte)HerkulexDescription.CommandSet.S_JOG, dataToSend);
+        }
+
+        private void S_JOG(Dictionary<byte, Servo> servos, byte playTime)
+        {
+            byte[] dataToSend = new byte[1 + 4 * servos.Count];
+            dataToSend[0] = playTime;
+            byte dataOffset = 1;
+
+            foreach(KeyValuePair<byte, Servo> servoIdPair in servos)
+            {
+                if (servoIdPair.Value.IsNextOrderSynchronous)
+                {
+                    dataToSend[dataOffset + 0] = (byte)(servoIdPair.Value.GetTargetAbsolutePosition() >> 0);
+                    dataToSend[dataOffset + 1] = (byte)(servoIdPair.Value.GetTargetAbsolutePosition() >> 8);
+                    dataToSend[dataOffset + 2] = servoIdPair.Value.GetSETByte();
+                    dataToSend[dataOffset + 3] = servoIdPair.Value.GetID();
+                    dataOffset += 4;
+                    servoIdPair.Value.IsNextOrderSynchronous = false;
+                }
             }
 
             EncodeAndSendPacket(serialPort, 0xFE, (byte)HerkulexDescription.CommandSet.S_JOG, dataToSend);
@@ -517,7 +746,9 @@ namespace HerkulexControl
             for (int i = 0; i < dataToSend.Length; i++)
                 packet[7 + i] = dataToSend[i];
 
-            port.Write(packet, 0, packet.Length);
+            FrameQueue.Enqueue(packet);
+            MessageEnqueuedEvent.Set();
+            //port.Write(packet, 0, packet.Length);
         }
 
         /// <summary>
@@ -538,10 +769,11 @@ namespace HerkulexControl
             packet[5] = CommonMethods.CheckSum1(packet[2], packet[3], packet[4]);
             packet[6] = CommonMethods.CheckSum2(packet[5]);
 
-            port.Write(packet, 0, packet.Length);
+            FrameQueue.Enqueue(packet);
+            MessageEnqueuedEvent.Set();
+            //port.Write(packet, 0, packet.Length);
         }
 
         #endregion LowLevelMethods
     }
-
 }

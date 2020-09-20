@@ -11,10 +11,7 @@ namespace HerkulexControl
         private byte cmd = 0;
         private byte checkSum1 = 0;
         private byte checkSum2 = 0;
-        private byte statusError = 0;
-        private byte statusDetail = 0;
         private byte[] packetData;
-
         private byte packetDataByteIndex = 0;
          
         private enum ReceptionStates
@@ -88,7 +85,11 @@ namespace HerkulexControl
                             byte clcChksum2 = CommonMethods.CheckSum2(clcChksum1);
 
                             if (checkSum1 == clcChksum1 && checkSum2 == clcChksum2)
-                                OnDataDecoded(packetSize, pID, cmd, checkSum1, checkSum2, packetData, statusError, statusDetail);
+                            {
+                                byte statusError = packetData[packetData.Length - 2];
+                                byte statusDetail = packetData[packetData.Length - 1];
+                                ProcessPacket(packetSize, pID, cmd, checkSum1, checkSum2, packetData, statusError, statusDetail);
+                            }
                             else
                                 OnCheckSumErrorOccured(pID, checkSum1, checkSum2);
 
@@ -99,58 +100,59 @@ namespace HerkulexControl
             }
         }
 
-        public void ProcessPacket(object sender, HklxPacketDecodedArgs e)
+        byte[] _GetOnlyDataFromReadOperations(byte[] data)
         {
-            byte[] _GetOnlyDataFromReadOperations(byte[] data)
-            {
-                if (data.Length <= 2)
-                    return data;
+            if (data.Length <= 2)
+                return data;
 
-                byte[] _data = new byte[data.Length - 4];
-                for (int i = 0; i < _data.Length; i++)
-                    _data[i] = data[i + 2];
-                return _data;
-            }
+            byte[] _data = new byte[data.Length - 4];
+            for (int i = 0; i < _data.Length; i++)
+                _data[i] = data[i + 2];
+            return _data;
+        }
 
-            int dataLen = e.PacketData.Length;
-            byte statusError = e.PacketData[dataLen - 2];
-            byte statusDetail = e.PacketData[dataLen - 1];
+
+        public void ProcessPacket(byte packetSize, byte pID, byte cmd, byte checkSum1, byte checkSum2, byte[] packetData, byte statusError, byte statusDetail)
+        {          
+            int dataLen = packetData.Length;
             byte[] readOperationData;
 
-            switch (e.CMD)
+            switch (cmd)
             {
                 case (byte)HerkulexDescription.CommandAckSet.ack_EEP_READ:
-                    readOperationData = _GetOnlyDataFromReadOperations(e.PacketData);
-                    OnEepReadAck(e.PID, statusError, statusDetail, e.PacketData[0], e.PacketData[1], readOperationData);
+                    readOperationData = _GetOnlyDataFromReadOperations(packetData);
+                    OnEepReadAck(pID, statusError, statusDetail, packetData[0], packetData[1], readOperationData);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_EEP_WRITE:
-                    OnEepWriteAck(e.PID, statusError, statusDetail);
+                    OnEepWriteAck(pID, statusError, statusDetail);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_RAM_READ:
-                    readOperationData = _GetOnlyDataFromReadOperations(e.PacketData);
-                    OnRamReadAck(e.PID, statusError, statusDetail, e.PacketData[0], e.PacketData[1], readOperationData);
+                    readOperationData = _GetOnlyDataFromReadOperations(packetData);
+                    OnRamReadAck(pID, statusError, statusDetail, packetData[0], packetData[1], readOperationData);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_RAM_WRITE:
-                    OnRamWriteAck(e.PID, statusError, statusDetail);
+                    OnRamWriteAck(pID, statusError, statusDetail);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_I_JOG:
-                    OnIjogAck(e.PID, statusError, statusDetail);
+                    OnIjogAck(pID, statusError, statusDetail);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_S_JOG:
-                    OnSjogAck(e.PID, statusError, statusDetail);
+                    OnSjogAck(pID, statusError, statusDetail);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_STAT:
-                    OnStatAck(e.PID, statusError, statusDetail);
+                    OnStatAck(pID, statusError, statusDetail);
                     break;
 
                 case (byte)HerkulexDescription.CommandAckSet.ack_ROLLBACK:
-                    OnRollbackAck(e.PID, statusError, statusDetail);
+                    OnRollbackAck(pID, statusError, statusDetail);
+                    break;
+                default:
                     break;
             }
 

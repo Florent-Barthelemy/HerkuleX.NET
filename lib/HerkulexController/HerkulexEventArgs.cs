@@ -138,5 +138,10 @@ namespace HerkulexControl
         public Servo Servo;
     }
 
+    public class HerkulexErrorArgs : EventArgs
+    {
+        public Servo Servo;
+    }
+
     #endregion OutputEventArgs
 }

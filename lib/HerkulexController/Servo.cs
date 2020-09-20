@@ -16,6 +16,7 @@ namespace HerkulexControl
         private HerkulexDescription.JOG_MODE Mode;
         private HerkulexDescription.LedColor LEDState;
         private UInt16 TargetAbsolutePosition;
+        public bool IsNextOrderSynchronous = false;
 
         public byte _playtime;
 
@@ -29,11 +30,20 @@ namespace HerkulexControl
         public bool IsInposition;
         public bool IsMotorOn;
 
-        //errors / details
+        //error details
         public bool CheckSumError;
         public bool UnknownCommandError;
         public bool ExceedRegRangeError;
         public bool GarbageDetectedError;
+
+        //errors
+        public bool Exceed_input_voltage_limit;
+        public bool Exceed_allowed_pot_limit;
+        public bool Exceed_Temperature_limit;
+        public bool Invalid_packet;
+        public bool Overload_detected;
+        public bool Driver_fault_detected;
+        public bool EEP_REG_distorted;
 
         public Servo(byte pID, HerkulexDescription.JOG_MODE mode)
         {
