@@ -61,6 +61,7 @@ namespace HerkulexControl
         private Thread DequeueThread;
 
         //default values
+        public bool FastPollMode = false;
         public bool AutoRecoverMode = false;
         private byte SynchronousPlaytime = 50;
         private int PollingInterval = 100;
@@ -87,10 +88,10 @@ namespace HerkulexControl
             PollingTimer = new System.Threading.Timer((c) =>
             {
                 PollingTimerThreadBlock.WaitOne();
-                foreach (KeyValuePair<byte, Servo> IdServoPair in Servos)
-                    RAM_READ(IdServoPair.Key, HerkulexDescription.RAM_ADDR.Absolute_Position, 2);
+                foreach (var key in Servos.Keys)
+                    RAM_READ(key, HerkulexDescription.RAM_ADDR.Absolute_Position, 2);
 
-            }, null, 0, PollingInterval);
+            }, null, 0, PollingInterval); 
         }
 
         // ram write ack event
@@ -186,11 +187,13 @@ namespace HerkulexControl
                                     break;
 
                                 case (byte)HerkulexDescription.CommandSet.I_JOG:
-                                    IjogAckReceivedEvent.WaitOne(AckTimeout);
+                                    if(!FastPollMode)
+                                     IjogAckReceivedEvent.WaitOne(AckTimeout);
                                     break;
 
                                 case (byte)HerkulexDescription.CommandSet.S_JOG:
-                                    SjogAckReceivedEvent.WaitOne(AckTimeout);
+                                    if(!FastPollMode)
+                                        SjogAckReceivedEvent.WaitOne(AckTimeout);
                                     break;
 
                                 default:
@@ -250,7 +253,10 @@ namespace HerkulexControl
         /// <param name="freq">Frequency</param>
         public void SetPollingFreq(int freq)
         {
-            PollingTimer.Change(0, (int)((1.0 / freq) * 1000));
+            if(freq != 0)
+                PollingTimer.Change(0, (int)((1.0 / freq) * 1000));
+            if (freq == 0)
+                PollingTimer.Change(0, 0);
         }
 
         /// <summary>
@@ -280,7 +286,11 @@ namespace HerkulexControl
             Servos.Add(ID, servo);
             Servos[ID].SetAbsolutePosition(initialPosition);
             //reply to all packets
-            RAM_WRITE(ID, HerkulexDescription.RAM_ADDR.ACK_Policy, 1, 0x02);
+            if(FastPollMode)
+                RAM_WRITE(ID, HerkulexDescription.RAM_ADDR.ACK_Policy, 1, 0x01); //do not reply to I_JOG / S_JOG, less secure
+            else
+                RAM_WRITE(ID, HerkulexDescription.RAM_ADDR.ACK_Policy, 1, 0x02); //reply to I_JOG / S_JOG, more secure
+
             RecoverErrors(servo);
         }
 
@@ -723,6 +733,8 @@ namespace HerkulexControl
             EncodeAndSendPacket(serialPort, TAG.ID, (byte)HerkulexDescription.CommandSet.S_JOG, dataToSend);
         }
 
+        static long calls = 0;
+
         /// <summary>
         /// Encodes and sends a packet with the Herkulex protocol
         /// </summary>
@@ -747,6 +759,7 @@ namespace HerkulexControl
                 packet[7 + i] = dataToSend[i];
 
             FrameQueue.Enqueue(packet);
+            //Console.WriteLine("InQueue " + FrameQueue.Count);
             MessageEnqueuedEvent.Set();
             //port.Write(packet, 0, packet.Length);
         }
