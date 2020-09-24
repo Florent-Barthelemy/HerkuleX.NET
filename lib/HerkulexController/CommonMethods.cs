@@ -82,30 +82,6 @@ namespace HerkulexControl
             return errorList;
         }
 
-        public static float NumericToDegree(UInt16 value)
-        {
-            const double m = 0.3125;
-            return (float)(value * m);
-        }
-
-        public static UInt16 DegreeToNumeric(float positionDeg)
-        {
-            const double m = 0.3125;
-            return LimitToInterval(0, 1023, (UInt16)(positionDeg / m));
-        }
-
-        public static float NumericToRad(UInt16 value)
-        {
-            const double m = 3.14159265359 / 180;
-            return (float)(NumericToDegree(value) * m);
-        }
-
-        public static UInt16 RadToNumeric(float positionRad)
-        {
-            const double m = 180 / 3.14159265359;
-            return LimitToInterval(0, 1023, (UInt16)(positionRad * m));
-        }
-
         private static UInt16 LimitToInterval(ushort min, ushort max, ushort value)
         {
             if (value > max)

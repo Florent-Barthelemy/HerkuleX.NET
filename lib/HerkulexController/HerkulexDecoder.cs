@@ -46,7 +46,7 @@ namespace HerkulexControl
 
                     case ReceptionStates.packetSize:
                         packetSize = b;
-                        packetData = new byte[packetSize - 7]; //init to the data size only -(status error, detail)
+                        packetData = new byte[packetSize - 7]; //init to the data size only, -(status error, detail)
                         rcvState = ReceptionStates.pID;
                         break;
 
