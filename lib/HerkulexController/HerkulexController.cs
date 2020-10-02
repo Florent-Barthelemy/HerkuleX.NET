@@ -10,7 +10,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Remoting.Channels;
 using System.Threading;
 using System.Timers;
-//using System.Threading;
 using System.Xml.Schema;
 using Timer = System.Timers.Timer;
 
@@ -98,7 +97,11 @@ namespace HerkulexControl
             {
                 PollingTimerThreadBlock.WaitOne();
                 foreach (var key in Servos.Keys)
+                {
                     RAM_READ(key, HerkulexDescription.RAM_ADDR.Absolute_Position, 2);
+                    RamReadAckReceivedEvent.WaitOne(10);
+                }
+                    
 
             }, null, 500, PollingInterval); 
         }
@@ -178,12 +181,11 @@ namespace HerkulexControl
         }
 
         //dequeuing in a thread
-        //ISSUE : FrameQueue is not thread safe, errors occurs
         private void DequeueFrames()
         {
             while(true)
             {
-                //timeout to avoid blocking the thread if MessageEnqueuedEvent does not set [WaitOne() for optimization]
+                //timeout to avoid blocking the thread if MessageEnqueuedEvent does not set [proc optimization]
                 MessageEnqueuedEvent.WaitOne(50);
                 lock (FrameQueue)
                 {
@@ -198,7 +200,7 @@ namespace HerkulexControl
                                 switch (packet[4])
                                 {
                                     case (byte)HerkulexDescription.CommandSet.RAM_READ:
-                                        AckReceived = RamReadAckReceivedEvent.WaitOne(AckTimeout);
+                                        //AckReceived = RamReadAckReceivedEvent.WaitOne(AckTimeout);
                                         if (!AckReceived)
                                             NackCount++;
                                         break;
@@ -252,26 +254,26 @@ namespace HerkulexControl
         /// <param name="minID">Min ID</param>
         /// <param name="maxID">Max ID</param>
         /// <returns></returns>
-        public byte[] ScanForServoIDs(int timeOut = 70, int minID = 1, int maxID = 10)
+        public byte[] ScanForServoIDs(int timeout = 70, int minID = 1, int maxID = 0xFD)
         {
             byte[] ID_Buffer = new byte[0xFD];
             
             int count = 0;
             bool AckReceived = false;
 
-            for(int ID = minID; ID < maxID; ID++)
+            for(int ID = minID; ID < maxID + 1; ID++)
             {
-                Console.Write("Scanning ID " + ID);
                 STAT((byte)ID);
-                AckReceived = StatAckReceivedEvent.WaitOne(timeOut);
+                Console.Write("Scanning -> " + ID + " ");
+                AckReceived = StatAckReceivedEvent.WaitOne(timeout);
                 if (AckReceived)
                 {
+                    Console.WriteLine("Online");
                     ID_Buffer[count] = (byte)ID;
                     count++;
-                    Console.Write(" -> Exists");
                 }
-                Console.WriteLine();
-                
+                else
+                    Console.WriteLine("Offline");
             }
 
             byte[] ID_Return = new byte[count];
@@ -288,7 +290,7 @@ namespace HerkulexControl
         /// <param name="freq">Frequency</param>
         public void SetPollingFreq(int freq)
         {
-            if (freq > 10)
+            if (freq > 50)
                 throw new Exception("Polling frequency is too high");
             if (freq != 0)
                 PollingTimer.Change(0, (int)((1.0 / freq) * 1000));
@@ -869,7 +871,7 @@ namespace HerkulexControl
                 packet[7 + i] = dataToSend[i];
 
             FrameQueue.Enqueue(packet);
-            //Console.WriteLine("InQueue " + FrameQueue.Count);
+            Console.WriteLine("inQueue : " + FrameQueue.Count);
             MessageEnqueuedEvent.Set();
             //port.Write(packet, 0, packet.Length);
         }

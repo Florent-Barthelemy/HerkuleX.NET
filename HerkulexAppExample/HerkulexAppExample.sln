@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30517.126
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkulexAppExample", "HerkulexAppExample.csproj", "{117CBF3C-5D63-44F9-995F-1876087E3DD0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HerkulexController", "..\lib\HerkulexController\HerkulexController.csproj", "{ADA2C3AB-18D0-4391-8066-272AB39102AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{117CBF3C-5D63-44F9-995F-1876087E3DD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{117CBF3C-5D63-44F9-995F-1876087E3DD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{117CBF3C-5D63-44F9-995F-1876087E3DD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{117CBF3C-5D63-44F9-995F-1876087E3DD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADA2C3AB-18D0-4391-8066-272AB39102AA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E95C9BB2-4138-4AE1-B74C-153C9798BB6A}
+	EndGlobalSection
+EndGlobal
