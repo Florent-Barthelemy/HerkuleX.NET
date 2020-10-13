@@ -9,6 +9,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.Remoting.Channels;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 using System.Xml.Schema;
 using Timer = System.Timers.Timer;
@@ -74,8 +75,11 @@ namespace HerkulexControl
         //statistics
         private long NackCount = 0;
 
+        
+
         public HerkulexController(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
         {
+            
             serialPort = new ReliableSerialPort(portName, baudRate, parity, dataBits, stopBits);
             decoder = new HerkulexDecoder();
 
@@ -92,6 +96,16 @@ namespace HerkulexControl
 
             serialPort.Open();
 
+            Task TaskA = Task.Run(() =>
+           {
+               while(true)
+               {
+
+                   Thread.Sleep(10);
+               }
+
+           });
+
             //starts 500ms after instanciation
             PollingTimer = new System.Threading.Timer((c) =>
             {
@@ -99,11 +113,10 @@ namespace HerkulexControl
                 foreach (var key in Servos.Keys)
                 {
                     RAM_READ(key, HerkulexDescription.RAM_ADDR.Absolute_Position, 2);
-                    RamReadAckReceivedEvent.WaitOne(10);
+                    RamReadAckReceivedEvent.WaitOne(AckTimeout);
                 }
-                    
+            }, null, 500, PollingInterval);
 
-            }, null, 500, PollingInterval); 
         }
 
         // STAT ack event
@@ -218,7 +231,8 @@ namespace HerkulexControl
                                         break;
 
                                     case (byte)HerkulexDescription.CommandSet.S_JOG:
-                                        AckReceived = SjogAckReceivedEvent.WaitOne(AckTimeout);
+                                        //Servos never replies
+                                       // AckReceived = SjogAckReceivedEvent.WaitOne(AckTimeout);
                                         if (!AckReceived)
                                             NackCount++;
                                         break;
@@ -288,6 +302,7 @@ namespace HerkulexControl
         /// Sets the polling frequency
         /// </summary>
         /// <param name="freq">Frequency</param>
+        ///
         public void SetPollingFreq(int freq)
         {
             if (freq > 50)
@@ -298,6 +313,7 @@ namespace HerkulexControl
                 PollingTimer.Change(0, 0);
 
         }
+
 
         /// <summary>
         /// Sets the servo acknowledge timeout
@@ -871,7 +887,7 @@ namespace HerkulexControl
                 packet[7 + i] = dataToSend[i];
 
             FrameQueue.Enqueue(packet);
-            Console.WriteLine("inQueue : " + FrameQueue.Count);
+            //Console.WriteLine("inQueue : " + FrameQueue.Count);
             MessageEnqueuedEvent.Set();
             //port.Write(packet, 0, packet.Length);
         }

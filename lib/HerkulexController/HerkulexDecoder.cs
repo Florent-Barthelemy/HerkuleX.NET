@@ -76,8 +76,9 @@ namespace HerkulexControl
                             packetData[packetDataByteIndex] = b;
                             packetDataByteIndex++;
                         }
-
-                        if (packetDataByteIndex == packetData.Length)
+                        
+                        if(!(packetDataByteIndex < packetData.Length))
+                        //if (packetDataByteIndex == packetData.Length)
                         {
                             packetDataByteIndex = 0;
 
